@@ -8,7 +8,9 @@ const ETF_MAP = {
     "588000": "sh588000"  // 科创板ETF
   };
   
-  const rawCode = req.query.code;
+  const { searchParams } = new URL(req.url, `http://${req.headers.host}`);
+  const rawCode = searchParams.get("code");
+
   const code = ETF_MAP[rawCode];
   
   if (!code) {
