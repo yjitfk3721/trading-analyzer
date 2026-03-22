@@ -695,8 +695,10 @@ async function runAnalysis() {
   if (symbol === "518880") {
     try {
       const stock = await fetchCNStockPrice("sh518880");
-  
-      const prices = generateMockPrices("GOLD_ETF");
+
+      const prices = stock.history;
+
+      const ma20 = calculateMA(prices, 20);
   
       // 用真实价格替换最后一个点
       prices[prices.length - 1] = stock.price;
@@ -799,6 +801,7 @@ async function fetchCNStockPrice(code) {
 
   return {
     price: data.price,
+    history: data.history,
     name: "华安黄金ETF（518880）"
   };
 }
