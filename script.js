@@ -794,18 +794,11 @@ window.addEventListener('load', () => {
 
 
 async function fetchCNStockPrice(code) {
-  const url = `https://qt.gtimg.cn/q=${code}`;
-
-  const res = await fetch(url);
-  const text = await res.text();
-
-  const data = text.split('~');
-
-  const price = parseFloat(data[3]);
-  const name = data[1];
+  const res = await fetch(`/api/price?code=${code}`);
+  const data = await res.json();
 
   return {
-    price,
-    name
+    price: data.price,
+    name: "华安黄金ETF（518880）"
   };
 }
