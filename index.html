@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>交易分析网站（CoinGecko 版）</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="header">
+        <div class="brand">
+          <div class="logo" aria-hidden="true">
+            <svg viewBox="0 0 24 24" class="logo-icon">
+              <path
+                d="M7 17L17 7M10 7H17V14"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </div>
+          <div>
+            <h1 class="title">股票 / 加密货币交易分析</h1>
+            <p class="subtitle">价格数据来自 CoinGecko · 7日走势图 + MA20 趋势分析</p>
+          </div>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="card input-card">
+          <h2 class="card-title">输入标的</h2>
+
+          <div class="field-row">
+            <label class="label" for="assetInput">标的名称</label>
+            <div class="input-wrap">
+              <input
+                id="assetInput"
+                class="text-input"
+                type="text"
+                placeholder="例如：BTC / TSLA / AAPL"
+                autocomplete="off"
+              />
+            </div>
+          </div>
+
+          <div class="field-row field-actions">
+            <button id="analyzeBtn" class="btn btn-primary" type="button">
+              开始分析
+            </button>
+            <button id="randomExampleBtn" class="btn btn-ghost" type="button">
+              随机示例
+            </button>
+          </div>
+
+          <div class="member-card">
+            <div class="member-header">
+              <div class="member-title">解锁高级分析</div>
+              <div id="memberStatus" class="member-status free">免费用户</div>
+            </div>
+            <div class="member-desc">
+              免费用户仅可查看趋势；高级用户可查看详细分析、图表细节与 AI 解释。
+            </div>
+            <button id="memberToggleBtn" class="btn btn-member" type="button">
+              升级为高级用户（模拟）
+            </button>
+          </div>
+
+          <div class="hint">
+            说明：图表优先使用 CoinGecko 的 <strong>market_chart（7天）</strong>。
+            MA20 与趋势判断继续使用简化逻辑（演示用途）。
+          </div>
+        </section>
+
+        <section class="card result-card">
+          <h2 class="card-title">分析结果</h2>
+
+          <div class="result-grid">
+            <div id="statCurrent" class="stat">
+              <div class="stat-label">当前价格</div>
+              <div id="currentPrice" class="stat-value">—</div>
+            </div>
+
+            <div id="statMA20" class="stat">
+              <div class="stat-label">20日均线 (MA20)</div>
+              <div id="ma20" class="stat-value">—</div>
+            </div>
+
+            <div id="statTrend" class="stat">
+              <div class="stat-label">当前趋势</div>
+              <div id="trendBadge" class="badge badge-neutral">—</div>
+            </div>
+
+            <div id="statRecommendation" class="stat">
+              <div class="stat-label">建议</div>
+              <div id="recommendation" class="stat-value stat-recommend">—</div>
+            </div>
+          </div>
+
+          <div id="premiumLockNote" class="premium-lock-note">
+            当前为免费模式：已隐藏高级分析内容。点击左侧“解锁高级分析”可查看完整结果。
+          </div>
+
+          <div id="chartSection" class="chart-wrap">
+            <div class="chart-header">
+              <div class="chart-title">最近7天价格走势图（CoinGecko）</div>
+              <div id="chartMeta" class="chart-meta">等待分析…</div>
+            </div>
+            <div id="apiError" class="api-error" style="display: none;"></div>
+            <canvas id="chartCanvas" class="chart-canvas" width="720" height="260">
+              你的浏览器不支持 canvas
+            </canvas>
+          </div>
+
+          <div id="aiExplainSection" class="ai-explain">
+            <div class="ai-explain-title">AI 分析解释（规则生成）</div>
+            <div id="aiExplainText" class="ai-explain-text">
+              等待分析后生成自然语言解释…
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div id="detailedRuleSection" class="explain">
+            <div class="explain-item">
+              <div class="explain-title">趋势判定（示例规则）</div>
+              <div class="explain-text" id="trendRule">
+                ——
+              </div>
+            </div>
+            <div class="explain-item">
+              <div class="explain-title">建议逻辑（示例规则）</div>
+              <div class="explain-text" id="recommendRule">
+                ——
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <span>免责声明：这是前端演示，仅供学习 UI 与指标计算逻辑，不构成投资建议。</span>
+      </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js" defer></script>
+  </body>
+</html>
+
