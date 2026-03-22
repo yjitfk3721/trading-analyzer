@@ -698,11 +698,8 @@ async function runAnalysis() {
 
       const prices = stock.history;
 
-      const ma20 = calculateMA(prices, 20);
-  
-      // 用真实价格替换最后一个点
-      prices[prices.length - 1] = stock.price;
-  
+
+ 
       renderAnalysis(stock.name, prices, {
         useRealPrice: true
       });

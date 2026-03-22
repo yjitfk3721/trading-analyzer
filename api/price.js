@@ -10,14 +10,13 @@ export default async function handler(req, res) {
   
       // 👉 模拟历史（下一步再换真实）
       const history = [];
+      let base = price;
+      
+      // 👉 往前推20天（模拟合理趋势）
       for (let i = 0; i < 20; i++) {
-        history.push(price * (0.95 + Math.random() * 0.1));
+        base = base * (0.995 + Math.random() * 0.01); // 小波动
+        history.unshift(base);
       }
-  
-      res.status(200).json({
-        price,
-        history
-      });
   
     } catch (error) {
       res.status(500).json({ error: 'fetch failed' });
