@@ -55,6 +55,35 @@ let priceChartInstance = null;
 let isProMember = false; // 默认免费用户
 
 /**
+ * 上一次用于画「7天走势图」的数据（切换会员时重绘，避免在 display:none 下测量错尺寸）
+ * @type {{ timestamps: number[], prices: number[] } | null}
+ */
+let lastChartRenderArgs = null;
+
+/**
+ * 销毁走势图：免费用户隐藏图表时应销毁实例，否则下次显示时 Chart.js 尺寸会错乱
+ */
+function destroyPriceChart() {
+  if (priceChartInstance) {
+    priceChartInstance.destroy();
+    priceChartInstance = null;
+  }
+}
+
+/**
+ * 在容器完成布局后强制 Chart 按当前 CSS 高度重算（修复切换显示后「被拉长」）
+ */
+function scheduleChartResize() {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (priceChartInstance && typeof priceChartInstance.resize === 'function') {
+        priceChartInstance.resize();
+      }
+    });
+  });
+}
+
+/**
  * 更新会员 UI 状态文案
  */
 function updateMemberUiState() {
@@ -486,6 +515,10 @@ function formatTsLabel(ts) {
  */
 function drawPriceChartWithChartJs(timestamps, prices) {
   if (!el.chartCanvas) return;
+  // 父级为 display:none 时宽高为 0，Chart.js 会算出错误尺寸，切换显示后会「拉长」
+  if (el.chartSection && getComputedStyle(el.chartSection).display === 'none') {
+    return;
+  }
   if (typeof Chart === 'undefined') {
     showApiError('图表库 Chart.js 未加载成功。');
     return;
@@ -520,9 +553,13 @@ function drawPriceChartWithChartJs(timestamps, prices) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      // 图表区域很矮时：收紧内边距、小字号、少刻度，尽量一页内可读
+      layout: {
+        padding: { top: 2, right: 4, bottom: 0, left: 2 },
+      },
       plugins: {
         legend: {
-          labels: { color: 'rgba(229, 231, 235, 0.9)', boxWidth: 10 },
+          display: false, // 标题已说明「7天走势」，省出垂直空间
         },
         tooltip: {
           callbacks: {
@@ -532,19 +569,28 @@ function drawPriceChartWithChartJs(timestamps, prices) {
       },
       scales: {
         x: {
-          grid: { color: 'rgba(148, 163, 184, 0.14)' },
-          ticks: { color: 'rgba(156, 163, 175, 0.9)', maxTicksLimit: 8 },
+          grid: { color: 'rgba(148, 163, 184, 0.1)', display: false },
+          ticks: {
+            color: 'rgba(156, 163, 175, 0.85)',
+            maxTicksLimit: 5,
+            maxRotation: 0,
+            font: { size: 9 },
+          },
         },
         y: {
-          grid: { color: 'rgba(148, 163, 184, 0.14)' },
+          grid: { color: 'rgba(148, 163, 184, 0.12)' },
           ticks: {
-            color: 'rgba(156, 163, 175, 0.9)',
+            color: 'rgba(156, 163, 175, 0.85)',
+            maxTicksLimit: 4,
+            font: { size: 9 },
             callback: (value) => formatPrice(Number(value)),
           },
         },
       },
     },
   });
+
+  scheduleChartResize();
 }
 
 /**
@@ -592,16 +638,19 @@ function renderAnalysis(symbol, prices, options = {}) {
   el.recommendRule.textContent =
     `建议 = ${recommendation.text}\n示例逻辑：\n- 上涨 → 买入\n- 下跌 → 卖出\n- 震荡 → 观望\n（实际交易建议需加入更多指标与风控）`;
 
-  // 绘制图表（优先真实7日数据）
+  // 准备走势图数据（供高级用户绘制，及切换会员时复用）
+  let chartTimestamps;
+  let chartPrices;
   if (options.chartTimestamps && options.chartPrices) {
-    drawPriceChartWithChartJs(options.chartTimestamps, options.chartPrices);
+    chartTimestamps = options.chartTimestamps;
+    chartPrices = options.chartPrices;
   } else {
-    // 回退：用模拟序列生成简易时间轴
     const now = Date.now();
     const step = 6 * 60 * 60 * 1000; // 6小时一个点（仅回退展示）
-    const fakeTs = prices.map((_, i) => now - (prices.length - 1 - i) * step);
-    drawPriceChartWithChartJs(fakeTs, prices);
+    chartTimestamps = prices.map((_, i) => now - (prices.length - 1 - i) * step);
+    chartPrices = prices;
   }
+  lastChartRenderArgs = { timestamps: chartTimestamps, prices: chartPrices };
 
   if (options.useRealPrice) {
     el.chartMeta.textContent = `标的：${symbol} · 最近 ${MARKET_CHART_DAYS} 天真实价格（CoinGecko）`;
@@ -609,8 +658,14 @@ function renderAnalysis(symbol, prices, options = {}) {
     el.chartMeta.textContent = `标的：${symbol} · 图表回退为模拟数据`;
   }
 
-  // 每次渲染后根据会员模式做显示控制
+  // 必须先应用会员显示状态，再创建 Chart（否则在 display:none 下测量会错位）
   applyMemberAccessControl();
+
+  if (isProMember) {
+    drawPriceChartWithChartJs(chartTimestamps, chartPrices);
+  } else {
+    destroyPriceChart();
+  }
 }
 
 // ==========================
@@ -620,25 +675,55 @@ function renderAnalysis(symbol, prices, options = {}) {
 /**
  * 触发一次分析：生成价格 → 计算 → 渲染
  */
+
+
 async function runAnalysis() {
-  const symbol = (el.assetInput.value || '').trim();
+  let symbol = (el.assetInput.value || '').trim().toUpperCase();
+
   if (!symbol) {
-    alert('请输入标的名称，例如 BTC 或 TSLA。');
+    alert('请输入标的，例如 518880');
     el.assetInput.focus();
     return;
   }
 
   clearApiError();
 
-  // 保留原有分析逻辑：先生成模拟序列（用于 MA20/趋势）
+  // 🎯 👉 核心改造：识别黄金ETF
+  const isGoldETF = symbol === "518880";
+
+  // 👉 强制黄金ETF走“本地模拟逻辑”
+  if (symbol === "518880") {
+    try {
+      const stock = await fetchCNStockPrice("sh518880");
+  
+      const prices = generateMockPrices("GOLD_ETF");
+  
+      // 用真实价格替换最后一个点
+      prices[prices.length - 1] = stock.price;
+  
+      renderAnalysis(stock.name, prices, {
+        useRealPrice: true
+      });
+  
+    } catch (e) {
+      const prices = generateMockPrices("GOLD_ETF");
+  
+      renderAnalysis("华安黄金ETF（518880）", prices, {
+        useRealPrice: false
+      });
+    }
+  
+    return;
+  }
+
+  // ===== 原来的逻辑（保留给 BTC 等） =====
+
   let analysisPrices = generateMockPrices(symbol);
 
-  // 尝试获取 CoinGecko 7天数据（market_chart）
   try {
     const market = await fetchMarketChartFromCoinGecko(symbol);
     const realCurrent = market.prices[market.prices.length - 1];
 
-    // 让原分析逻辑“对齐”实时当前价格
     analysisPrices = alignSeriesToCurrent(analysisPrices, realCurrent);
 
     renderAnalysis(symbol, analysisPrices, {
@@ -647,8 +732,7 @@ async function runAnalysis() {
       chartPrices: market.prices,
     });
   } catch (error) {
-    // API 失败：显示错误提示，并回退到模拟分析 + 模拟图
-    showApiError(`CoinGecko 7天价格获取失败：${error.message}。已回退到模拟数据。`);
+    showApiError(`数据获取失败：${error.message}，已使用模拟数据`);
     renderAnalysis(symbol, analysisPrices, { useRealPrice: false });
   }
 }
@@ -683,6 +767,12 @@ if (el.memberToggleBtn) {
     isProMember = !isProMember;
     updateMemberUiState();
     applyMemberAccessControl();
+    // 切换到高级：用缓存数据在「已可见」的容器里重绘；切到免费：销毁图表
+    if (isProMember && lastChartRenderArgs) {
+      drawPriceChartWithChartJs(lastChartRenderArgs.timestamps, lastChartRenderArgs.prices);
+    } else if (!isProMember) {
+      destroyPriceChart();
+    }
   });
 }
 
@@ -697,8 +787,25 @@ if (el.assetInput) {
 window.addEventListener('load', () => {
   updateMemberUiState();
   applyMemberAccessControl();
-  const defaultSymbol = 'BTC';
+  const defaultSymbol = '518880';
   if (el.assetInput) el.assetInput.value = defaultSymbol;
   runAnalysis();
 });
 
+
+async function fetchCNStockPrice(code) {
+  const url = `https://qt.gtimg.cn/q=${code}`;
+
+  const res = await fetch(url);
+  const text = await res.text();
+
+  const data = text.split('~');
+
+  const price = parseFloat(data[3]);
+  const name = data[1];
+
+  return {
+    price,
+    name
+  };
+}

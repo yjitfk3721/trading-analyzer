@@ -334,7 +334,9 @@ body {
 }
 
 .chart-wrap {
-  margin-top: 8px;
+  margin-top: 6px;
+  /* 防止 Chart.js 在异常尺寸下把画布撑出容器 */
+  overflow: hidden;
 }
 
 .chart-header {
@@ -342,7 +344,7 @@ body {
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 
 .chart-title {
@@ -367,8 +369,11 @@ body {
 }
 
 .chart-canvas {
+  display: block;
   width: 100%;
-  height: 280px;
+  height: 70px;
+  max-height: 70px;
+  min-height: 70px;
   border-radius: var(--radius-md);
   border: 1px solid rgba(148, 163, 184, 0.2);
   background: rgba(2, 6, 23, 0.24);
